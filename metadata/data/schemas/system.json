@@ -1,0 +1,34 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "The schema that this document should conform to"
+        },
+        "systems": {
+            "type": "array",
+            "description": "List of systems",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the system"
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "Type of the system. Split subtypes with a dot",
+                        "pattern": "^[a-z]+(\\.[a-z]+)*$"},
+                    "comment": {
+                        "type": "string",
+                        "description": "Comment about the system"
+                    }
+                },
+                "required": ["name", "type", "comment"],
+                "additionalProperties": false
+            }
+        }
+    },
+    "required": ["$schema", "systems"]
+}

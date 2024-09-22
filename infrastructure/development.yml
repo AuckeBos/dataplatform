@@ -1,0 +1,17 @@
+services:
+  database-server:
+    image: mongo:latest
+    container_name: database-server
+    env_file: .env
+    ports:
+      - 15001:27017
+    volumes:
+      - databases:/data/db
+    restart: unless-stopped
+
+volumes:
+  databases:
+
+networks:
+  default:
+    name: dataplatform

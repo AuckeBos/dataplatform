@@ -1,0 +1,15 @@
+{
+    "$schema": "./schemas/system.json",
+    "systems": [
+        {
+            "name": "bank",
+            "type": "restapi.bunq",
+            "comment": "Bunq API"
+        },
+        {
+            "name": "ynab",
+            "type": "rest.ynab",
+            "comment": "YNAB API"
+        }
+    ]
+}
