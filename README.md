@@ -73,3 +73,14 @@ The following components will be described before writing any code.
     - Watchtower
     - Traefik
     - Portainer
+
+
+# Metadata
+The dataplatform is metadata driven. This means that all systems, entities and columns are defined in metadata. Each step in the pipeline has access to this metadata, and process data accordingly. The schema of the metadata is not defined in something like jsonschema, but in Pydantic models. The reason for this choice is that we'll need to use Pydantic to load the metadata into objects anyway. Since Pydantic is strongly typed, this directly defines the schema. The metadata itself is defined in json files. The metadata refers to the Pydantic class that is built for it, and the code instantiates it accordingly. The following metadata files are defined:
+- systems.json: Defines the systems that are part of the dataplatform. A system is defined by some source that we want to ingest and process data for. It contains a name, a description, and a type. The type is used to determine what kind of connector should be used to ingest data. It links directly to a Connector class, which uses a standardized interface to load and store data. The metadata also defines attributes required for the specific connection type, like a url, a username, or a connection string. Therefor, each system type will have a different schema. Different Pydantic models are used, with the same base class. The system type is used to determine which Pydantic model to use. 
+- entities.json: Defines the entities that are part of the dataplatform. An entity is usually a table in a source database, or an entity in an API definition. It contains a name, a description, and a system_id. The system_id links to the system that the entity is part of. It also defines the load_type: full or delta. It also contains a list of columns. Each column has a name, a type, and if required attributes as length and precision. 
+
+While the system grows in features, the metadata will grow as well. More attributes will be added, to guide the logic that processes the data.
+
+During deployment, the metadata is loaded into the database. These are collections in a Mongo database called "metadata" in the mongodb server. The json is pushed to the mongo collections in mode overwrite, using the mongo cli. 
+
