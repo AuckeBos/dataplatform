@@ -58,6 +58,7 @@ The following components will be described before writing any code.
   - pytest
   - all should be unittested
   - integration tests
+- Data quality. GX
 - Libraries: An overview of what libraries are used for what purpose.
   - Kink for dependency injection
   - Sqlalchemy for postgres interaction
@@ -74,10 +75,11 @@ The following components will be described before writing any code.
     - Watchtower
     - Traefik
     - Portainer
+    - Be able to run all deployment steps in the pipeline, but also locally. Hence in the pipeline run the ps1 scripts that can also be ran locally.
 
 # Metadata
 The dataplatform is metadata driven. This means that all systems, entities and columns are defined in metadata. Each step in the pipeline has access to this metadata, and process data accordingly. The schema of the metadata is not defined in something like jsonschema, but in Pydantic models. The reason for this choice is that we'll need to use Pydantic to load the metadata into objects anyway. Since Pydantic is strongly typed, this directly defines the schema. The metadata itself is defined in json files. The metadata refers to the Pydantic class that is built for it, and the code instantiates it accordingly. The metadata wil use secrets to connect to the systems. The secrets are stored in a secret store, and are retrieved by the metadata loader. Each metadata key that refers to a secret instead of a value, has a value of type object instead of of type string. The object will contain "type":"secret", and "key": "keyname". The metadata loader will retrieve the secret from the secret store, and replace the object with the actual value. The following metadata files are defined:
-- systems.json: Defines the systems that are part of the dataplatform. A system is defined by some source that we want to ingest and process data for. It contains a name, a description, and a type. The type is used to determine what kind of connector should be used to ingest data. It links directly to a Connector class, which uses a standardized interface to load and store data. The metadata also defines attributes required for the specific connection type, like a url, a username, or a connection string. Therefor, each system type will have a different schema. Different Pydantic models are used, with the same base class. The system type is used to determine which Pydantic model to use. 
+- systems.json: Defines the systems that are part of the dataplatform. Each system is identified by a 3-letter code, followed by a number in format `01`. A system is defined by some source that we want to ingest and process data for. It contains a name, a description, and a type. The type is used to determine what kind of connector should be used to ingest data. It links directly to a Connector class, which uses a standardized interface to load and store data. The metadata also defines attributes required for the specific connection type, like a url, a username, or a connection string. Therefor, each system type will have a different schema. Different Pydantic models are used, with the same base class. The system type is used to determine which Pydantic model to use. 
 - entities.json: Defines the entities that are part of the dataplatform. An entity is usually a table in a source database, or an entity in an API definition. It contains a name, a description, and a system_id. The system_id links to the system that the entity is part of. It also defines the load_type: full or delta. The entity attributes, their types, and primary keys are _not_ defined in the metadata. Instead, this metadata is defined through the Pydantic model of that entity. The Pydantic model also defines the SCD types of the attributes (1 or 2).
 - actions.json: Defines the actions that can be performed on triggers. An action is a piece of code that is executed when an event is sent. This metadata defines the action upon which we should act. It also refers the class that contains the logic. During deployment type, we make sure Prefect Actions (using Prefect Deployments) are created accordingly. The connectors / processors contain generic logic to sent events. We define some platform-generic events, like system-layer processed, and entity-layer-processed. The actions refer to these platform-specific events.
 
@@ -90,6 +92,7 @@ Auditing tables exist to track changes in the data. While Prefect contains a UI 
 - system_run: The highest level auditing table. Contains a record for each run of a system. It links to the system, and records timestamps and success/failure. It also indicates numbers like: nr entities succeeded, nr entities failed, nr of entities skipped. 
 - system_layer_run: Contains a record for each layer processed for each system. It links to the system_run, and records timestamps and success/failure. It also indicates numbers like: nr entities succeeded, nr entities failed, nr of entities skipped.
 - entity_layer_run: The most detailed level of auditing. Contains a record for each entity processed for each layer for each system. It links to the system_layer_run and the system run. Also records timestamps and success/failure. It also records: nr of records in, nr of records inserted, nr of records updated, nr of records deleted.
+- cursor: used to record timestamps of runs for systems. It includes start and end. For delta systems (this is defined in the system metadata), we use this table to load the last run timestamp. This timestamp is used by the system-specific connector, to provide it to the source in the source-specific way that it requires. 
 
 # Secrets
 We use Hashicorp Vault as a secret store. It runs in a docker container, and we connect to it through the Python sdk. Generally, metadata will refer to a secret key, and the SecretLoader will load the value from the vault. The master key to the vault is stored in an environment variable.
@@ -166,3 +169,14 @@ Source connectors are code structures to load data from a source system into the
 
 # Actions
 The dataplatform also provides operational-like actions. This can trigger actions based on data that is being loaded / received. An example of an action is sending emails, or training ML models. These actions are triggered by events, which will be sent by the proper flow. In the entity metadata, we define if and when an event should be sent. In the action metadata, we define stuff required for the action to be ran, and action type. Again, this metadata refers to the class that contains the logic. 
+
+# Testing
+We refrain from deploying any code without unittests. This is partly because we want to force ourselves to learn to always write tests. Ofcourse, we again try to generate the tests, instead of writing them ourselves. We use an iterative approach:
+1. Write / generate docs
+2. Generate/update code
+3. Generate/update tests
+4. Step 2 if fails, else done
+
+All logic contains unit tests. Moreover, we have integration tests to test the flow of data through the system. For this purpose, we define a test system. The data of this system is generated. The storage is simple json files. Therefor we also have a json file system type. Integration tests use this test system. Moreover, there are recurring triggers that process the data of this source system on a regular basis, also in production.
+
+We use pytest. Tests are ran locally in VSCode, but also during build. Required to succeed, both unit and integration tests.
