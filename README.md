@@ -180,3 +180,6 @@ We refrain from deploying any code without unittests. This is partly because we 
 All logic contains unit tests. Moreover, we have integration tests to test the flow of data through the system. For this purpose, we define a test system. The data of this system is generated. The storage is simple json files. Therefor we also have a json file system type. Integration tests use this test system. Moreover, there are recurring triggers that process the data of this source system on a regular basis, also in production.
 
 We use pytest. Tests are ran locally in VSCode, but also during build. Required to succeed, both unit and integration tests.
+
+# Data Quality
+We use Great Expectations to test the quality of our data. Checks are performed after landing, before bronze. Ie this is the first step of the bronze flow. We use generic checks for all data: uniqueness checks, column count checks. The metadata can define extra tests. The metadata can also define min/max counts, but absolute and percentage. These are converted into Great Expectations tests during the bronze flow. If a test fails, the flow fails. This means only that specific entity is not processed, and errors are logged. 
