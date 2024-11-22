@@ -183,3 +183,20 @@ We use pytest. Tests are ran locally in VSCode, but also during build. Required 
 
 # Data Quality
 We use Great Expectations to test the quality of our data. Checks are performed after landing, before bronze. Ie this is the first step of the bronze flow. We use generic checks for all data: uniqueness checks, column count checks. The metadata can define extra tests. The metadata can also define min/max counts, but absolute and percentage. These are converted into Great Expectations tests during the bronze flow. If a test fails, the flow fails. This means only that specific entity is not processed, and errors are logged. 
+
+# Libraries
+The sections describes what libraries we use for what purposes. It includes links to the docs pages of the libraries. The main goals is to guide the LLM to provide a code base that uses these libraries.
+- [Kink](https://pypi.org/project/kink/) for dependency injection.
+- [Rye](https://rye.astral.sh/) as package and environment manager. We use Python >= 3.12
+- [Ruff](https://pypi.org/project/ruff/) for linting. We also add a VSCode task to run it on the complete base. Ruff check is a mandatory step in the build pipeline.
+- [Sqlalchemy](https://www.sqlalchemy.org/) as ORM for bronze+.
+- [Alembic](https://alembic.sqlalchemy.org/en/latest/) for migrations of the postgres databases. 
+- [Mongoengine](https://docs.mongoengine.org/) as ORM (ODM) for mongo (metadata and landingzone).
+- [Pydantic](https://docs.pydantic.dev/latest/) for data validation, but also metadata schemas.
+- [Prefect](https://docs.prefect.io/) as orchestration engine.
+- [mlflow](https://mlflow.org/) for ML experimentation, (experiment and model) tracking, model versioning and deployment.
+- [mlserver](https://mlserver.readthedocs.io/) for model serving.
+- [fastapi](https://fastapi.tiangolo.com/) for webhooks. 
+- [pytest](https://docs.pytest.org/) for testing.
+- [python-dotenv](https://pypi.org/project/python-dotenv/) for loading environment variables from a .env file.
+- 
