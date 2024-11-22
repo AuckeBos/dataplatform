@@ -199,4 +199,6 @@ The sections describes what libraries we use for what purposes. It includes link
 - [fastapi](https://fastapi.tiangolo.com/) for webhooks. 
 - [pytest](https://docs.pytest.org/) for testing.
 - [python-dotenv](https://pypi.org/project/python-dotenv/) for loading environment variables from a .env file.
-- 
+
+# Deployment
+We use Portainer to manage the containers in the compose file. We create a Dockerfile which will include our source code in the image. The development container will use this Dockerfile; it will have a mount to the code on the host. The same container in production will instead reference the public image, which we push to the Docker hub during deployment. A Watchtower container is used to update the containers whenever we push a new image. We use a Traefik reverse proxy as entrypoint and for SSL cert management. For all deployment and/or build steps, we ensure we can both run them locally as well as in the github actions pipelines, using the exact same logic. This means that the actions will run the ps1 scripts that can also be ran locally.
