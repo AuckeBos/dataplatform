@@ -20,63 +20,6 @@ This approach has several advantages:
 - We spend less time on building easy and repetitive code.
 - We can focus on the more challenging parts of the project.
 
-# Documentation components
-The following components will be described before writing any code. 
-- Metadata: Where and how is the metadata defined, and how is it used? Where is the metadata stored?
-  - Schemas not with jsonschema, but with Pydantic models.
-- Auditing: What is audited, where is it stored?
-  - Run timestamp and ids as cols to each table
-  - generated cols like ids, scd1/2 hashes, key_hashes, created_at, updated_at
-- Secrets: Where and how are secrets stored, and how are they retrieved?
-  - Some kind of secret store, with a python client to interact with it
-- Triggers: What triggers are supported, and how?
-  - Time-based triggers
-  - Event-based triggers
-  - Callback-based triggers
-- Data layers: What data layers exist?
-  - raw, bronze, silver, gold
-- Storage: What storage solutions are used for what purpose?
-  - Mongo
-  - Postgres
-- Orchestration: What orchestration engine is used?
-  - Prefect
-- Infrastructure: On what infrastructure should the platform run?
-  - Docker & docker compose
-- Data flow: How does data flow through layers? When and how is data archived and/or deleted?
-  - raw: write jsonfiles
-  - bronze: docs in mongo
-  - silver: scd2 enabled postgres
-  - gold: custom business logic, combining source tables
-- Source connectors: How is the connector system configured, and how should one approach building a new connector?
-  - base classes to load data
-  - Implementations using rest apis or sdks
-- Actions. The dataplatform will support performing actions on triggers. These actions include stuff like sending emails or training machinelearning models. 
-- Data type: What type of data is supported? Include full load and delta loads.
-  - full load
-  - delta
-- Testing: What testing framework and strategy are used, and what types of tests are included?
-  - pytest
-  - all should be unittested
-  - integration tests
-- Data quality. GX
-- Libraries: An overview of what libraries are used for what purpose.
-  - Kink for dependency injection
-  - Sqlalchemy for postgres interaction
-    - Alembric for migrations
-  - Mongoengine for mongo interaction
-  - Pydantic for schemas
-  - Prefect for orchestration
-  - mlflow for experimentation
-    - future
-  - Secrets store: ?
-- Deployment: To what infra and how should the project be deployed?
-    - Docker
-    - Docker compose
-    - Watchtower
-    - Traefik
-    - Portainer
-    - Be able to run all deployment steps in the pipeline, but also locally. Hence in the pipeline run the ps1 scripts that can also be ran locally.
-
 # Metadata
 The dataplatform is metadata driven. This means that all systems, entities and columns are defined in metadata. Each step in the pipeline has access to this metadata, and process data accordingly. The schema of the metadata is not defined in something like jsonschema, but in Pydantic models. The reason for this choice is that we'll need to use Pydantic to load the metadata into objects anyway. Since Pydantic is strongly typed, this directly defines the schema. The metadata itself is defined in json files. The metadata refers to the Pydantic class that is built for it, and the code instantiates it accordingly. The metadata wil use secrets to connect to the systems. The secrets are stored in a secret store, and are retrieved by the metadata loader. Each metadata key that refers to a secret instead of a value, has a value of type object instead of of type string. The object will contain "type":"secret", and "key": "keyname". The metadata loader will retrieve the secret from the secret store, and replace the object with the actual value. The following metadata files are defined:
 - systems.json: Defines the systems that are part of the dataplatform. Each system is identified by a 3-letter code, followed by a number in format `01`. A system is defined by some source that we want to ingest and process data for. It contains a name, a description, and a type. The type is used to determine what kind of connector should be used to ingest data. It links directly to a Connector class, which uses a standardized interface to load and store data. The metadata also defines attributes required for the specific connection type, like a url, a username, or a connection string. Therefor, each system type will have a different schema. Different Pydantic models are used, with the same base class. The system type is used to determine which Pydantic model to use. 
@@ -109,6 +52,12 @@ The data flows through the following layers:
 - Bronze. The bronze layer is also append-only, but in a standardized format. The step from landing to bronze is the most complex one. This step will contain specific logic, which will also flatten and split complex objects into multiple entities. Processing data into bronze goes per-entity. However, how an entity should be retrieved from the landing zone differs greatly per entity. It can be an as-is copy from landing, it could be extracting a nested object from a parent, or it could be copying a parent, but dropping nested properties. The logic will not be system-specific, but pattern-specific. When a new pattern of landing->bronze is found, a processor is created for this pattern. The metadata of the bronze (which is also the silver) entity will reference the processor type. This ensures that any future systems returning data in this format, do not require new code. We therefor have a BronzeProcessor for each landing structure type. This processor receives the target entity as parameter. The metadata will define the landing_entity which will contain the data for the bronze entity. The structure-specific processor contains the specific logic to extract the bronze entity from the landing-entity data. 
 - Silver. In this layer, we maintain SCD2 history. The bronze-silver entity relationship is one-to-one. There is no flattening or simplifying. The goal of the silver layer is to maintain scd2 history using generic logic.
 - Gold. This layer contains business logic. New entities will be created here, usually by combining multiple source entities. It can also use ML models to generate new entities. This layer is not based on metadata, since it contains custom business logic.
+
+The audit tables contain result statuses for the batches. If some entity fails for some layer, this is represented in those layers. When a flow starts, it always checks the audit tables for the given input. If they indicate that some flow is either still running, or was yet successful, the flow will not start. It wil log this, and return. It is possible that some entities should be processed, and some should not. The flow run can indicate to override this, and to force process the data anyway. This would be done by a manual run, to reprocess data. 
+
+To rerun failed pipelines, we have two options:
+- Rerun the failed run. We use the prefect UI to rerun the failed run. This will rerun the flow, and all tasks that failed. This is useful if the failure was due to a temporary issue, like a network error.
+- Start a new run with the right parameters. This can also be used to rerun specific parts, for example some entity in some layer. 
 
 # Storage
 We use two different storage solutions: Mongo and Postgres. Mongo is used to store metadata and data in the landingzone. This is a good fit, since the data is often semi structured and nested. Because we will not query on source data directly, we do not have a requirement of a SQL interface. Because we will want to query on processed data, we use Postgres. This means that we'll often have a flattening step when moving data from landing to bronze. Flattening is done by following defined conventions. For example: a nested attribute is flattened into a column that concatenates nesting levels using underscores.
